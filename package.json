@@ -1,0 +1,23 @@
+{
+  "name": "hurricane-alert-api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 3001",
+    "build": "tsc --noEmit",
+    "migrate": "node --env-file=.env.local scripts/migrate.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.13.1",
+    "resend": "^4.0.1",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "@types/web-push": "^3.6.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

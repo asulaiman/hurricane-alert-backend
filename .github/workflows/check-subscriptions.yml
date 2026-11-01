@@ -1,0 +1,23 @@
+name: Check subscriptions
+
+on:
+  schedule:
+    - cron: '*/20 * * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: check-subscriptions
+  cancel-in-progress: false
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call cron endpoint
+        run: |
+          curl --fail --show-error --silent \
+            -X POST "${API_BASE_URL}/api/cron/check-subscriptions" \
+            -H "Authorization: Bearer ${CRON_SECRET}"
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
