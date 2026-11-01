@@ -1,8 +1,19 @@
-# hurricane-alert-api
+# hurricane-alert-backend
 
-Backend service for [hurricane-alert](https://github.com/asulaiman/hurricane-alert).
+Backend service for [hurricane-alert-frontend](https://github.com/asulaiman/hurricane-alert-frontend).
 It serves official weather alerts, subscription and verification endpoints,
 push and email delivery, and the scheduled subscription checker.
+
+## Ownership
+
+This repository alone owns Open-Meteo forecast parsing and advisory thresholds.
+The same calculation powers `GET /api/forecast` and the subscription checker;
+the frontend consumes `{ current, timezone, advisory }` over HTTP and does not
+import backend source or recalculate advisories. Geocoding and browser APIs
+belong to the frontend; the unused copied geocoding implementation was removed.
+Vite remains backend-only local server tooling for serverless routes, not a
+frontend build. The CI Slack notifier is independently maintained deployment
+tooling in each repo so neither checkout depends on the other.
 
 ## Run locally
 
@@ -47,7 +58,8 @@ No database credentials, real emails, push deliveries, or separately running
 API are needed. Tests use an automatically assigned port, so the local preview
 on port 3001 is unaffected.
 
-The suite checks availability and CORS for all six exposed routes; normalized
+The suite checks availability and CORS for all seven exposed routes; forecast
+data shapes and advisory threshold boundaries; normalized
 NWS/GDACS alert data; subscription and push JSON success/error shapes;
 verification/unsubscribe HTML confirmations; and authenticated cron counters,
 location grouping, and notification URL contracts. There is no `/api/health`
@@ -71,7 +83,7 @@ Notifier errors are reported explicitly.
 An authorized Slack administrator must provision an incoming webhook bound to
 **#hurricane-app-alerting** (channel `C0CDX2E5546`), then store its URL directly
 in this repository's **Settings > Secrets and variables > Actions** as
-`SLACK_WEBHOOK_URL`. Add the same secret in `asulaiman/hurricane-alert` for
+`SLACK_WEBHOOK_URL`. Add the same secret in `asulaiman/hurricane-alert-frontend` for
 frontend failures. Do not paste webhook URLs into chat, commit them, or print
 them in logs. The destination channel is configured in Slack.
 Live delivery remains unavailable until the webhook and secrets are configured;

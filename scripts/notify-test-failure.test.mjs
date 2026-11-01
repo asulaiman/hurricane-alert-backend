@@ -8,10 +8,10 @@ const config = {
   outcome: 'failure',
   cancelled: 'false',
   webhookUrl: 'https://hooks.slack.com/services/SYNTHETIC/NOT/REAL',
-  service: 'Frontend',
-  repository: 'asulaiman/hurricane-alert',
+  service: 'Backend',
+  repository: 'asulaiman/hurricane-alert-backend',
   ref: 'refs/heads/main',
-  runUrl: 'https://github.com/asulaiman/hurricane-alert/actions/runs/123',
+  runUrl: 'https://github.com/asulaiman/hurricane-alert-backend/actions/runs/123',
 }
 
 for (const outcome of ['success', 'cancelled', 'skipped', undefined]) {

@@ -5,6 +5,7 @@ import { createServer as createViteServer } from 'vite'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiDevServerPlugin } from '../api/_lib/devServer'
 import alerts from '../api/alerts'
+import forecastHandler from '../api/forecast'
 import subscribe from '../api/subscribe'
 import pushSubscribe from '../api/push/subscribe'
 import verifyEmail from '../api/verify-email'
@@ -27,6 +28,7 @@ vi.mock('../api/_lib/push', () => ({ sendPushNotification: mocks.push }))
 
 const handlers = {
   'alerts.ts': alerts,
+  'forecast.ts': forecastHandler,
   'subscribe.ts': subscribe,
   'push/subscribe.ts': pushSubscribe,
   'verify-email.ts': verifyEmail,
@@ -57,20 +59,21 @@ function dbResult(rows = [], rowCount = rows.length) {
   return { rows, rowCount }
 }
 
-function upstreamForecast(wind = 10) {
-  const time = ['2026-11-01T00:00', '2026-11-01T01:00', '2026-11-01T02:00', '2026-11-01T03:00']
+function upstreamForecast(wind = 10, { gust = wind, rain = 0, pastWind = 10 } = {}) {
+  const time = Array.from({ length: 51 }, (_, i) =>
+    new Date(Date.UTC(2026, 10, 1, i)).toISOString().slice(0, 16))
   return {
     timezone: 'UTC',
     current: {
-      time: time[3], wind_speed_10m: wind, wind_gusts_10m: wind,
+      time: time[3], wind_speed_10m: wind, wind_gusts_10m: gust,
       precipitation: 0, surface_pressure: 1000,
     },
     hourly: {
       time,
-      wind_speed_10m: [10, 10, 10, wind],
-      wind_gusts_10m: [10, 10, 10, wind],
-      precipitation: [0, 0, 0, 0],
-      surface_pressure: [1000, 1000, 1000, 1000],
+      wind_speed_10m: time.map((_, i) => i < 3 ? pastWind : wind),
+      wind_gusts_10m: time.map(() => gust),
+      precipitation: time.map((_, i) => i >= 3 && i < 27 ? rain / 24 : 0),
+      surface_pressure: time.map(() => 1000),
     },
   }
 }
@@ -209,6 +212,66 @@ describe('Endpoint availability and CORS', () => {
     const response = await request('/api/health')
     expect(response.status).toBe(404)
     expect(await response.text()).toBe('Not found')
+  })
+})
+
+describe('GET /api/forecast owns forecast analysis', () => {
+  for (const [name, wind, options, level] of [
+    ['below strong wind', 24, { gust: 38 }, 0],
+    ['strong wind', 25, {}, 1],
+    ['strong gust', 10, { gust: 39 }, 1],
+    ['below tropical storm', 38, { gust: 57 }, 1],
+    ['tropical wind', 39, {}, 2],
+    ['tropical gust', 10, { gust: 58 }, 2],
+    ['below hurricane', 73, { gust: 99 }, 2],
+    ['hurricane wind', 74, {}, 3],
+    ['hurricane gust', 10, { gust: 100 }, 3],
+    ['below rainfall', 10, { rain: 2.9 }, 0],
+    ['flash flood rainfall', 10, { rain: 3 }, 1],
+    ['past wind excluded', 10, { pastWind: 100 }, 0],
+  ]) {
+    it(`calculates ${name}`, async () => {
+      upstreamFetch.mockResolvedValue(Response.json(upstreamForecast(wind, options)))
+      const response = await request('/api/forecast?lat=25.7617&lon=-80.1918')
+      expect(response.status).toBe(200)
+      expect(response.headers.get('content-type')).toContain('application/json')
+      expect(await response.json()).toEqual({
+        timezone: 'UTC',
+        current: {
+          time: '2026-11-01T03:00', windSpeed: wind, windGusts: options.gust ?? wind,
+          precipitation: 0, surfacePressure: 1000,
+        },
+        advisory: {
+          level, label: expect.any(String), description: expect.any(String), color: expect.any(String),
+          maxSustainedWind: { value: wind, time: '2026-11-01T03:00' },
+          maxGust: { value: options.gust ?? wind, time: '2026-11-01T03:00' },
+          next24hPrecipitation: expect.closeTo(options.rain ?? 0),
+          flashFloodRisk: options.rain === 3, pressureDropLast3h: 0,
+        },
+      })
+      expect(upstreamFetch.mock.calls[0][0]).toContain('wind_speed_unit=mph')
+      expect(upstreamFetch.mock.calls[0][0]).toContain('past_hours=3')
+    })
+  }
+  for (const query of ['', '?lat=bad&lon=0', '?lat=91&lon=0', '?lat=0&lon=181', '?lat=&lon=0']) {
+    it(`rejects invalid coordinates ${query}`, async () => {
+      await expectJson(await request(`/api/forecast${query}`), 400, {
+        error: 'Valid lat and lon query params are required',
+      })
+      expect(upstreamFetch).not.toHaveBeenCalled()
+    })
+  }
+  it('rejects unsupported methods', async () => {
+    await expectJson(await request('/api/forecast', { method: 'POST' }), 405, {
+      error: 'Method not allowed',
+    })
+  })
+  it('reports upstream failure', async () => {
+    upstreamFetch.mockRejectedValue(new Error('Weather unavailable'))
+    await expectJson(await request('/api/forecast?lat=25&lon=-80'), 502, {
+      error: 'Could not fetch forecast',
+    })
+    expect(errorLog).toHaveBeenCalled()
   })
 })
 
