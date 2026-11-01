@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite --port 3001",
     "build": "tsc --noEmit",
+    "test": "vitest run",
+    "test:notifications": "node --test scripts/notify-test-failure.test.mjs",
+    "test:watch": "vitest",
     "migrate": "node --env-file=.env.local scripts/migrate.mjs"
   },
   "dependencies": {
@@ -18,6 +21,7 @@
     "@types/pg": "^8.11.10",
     "@types/web-push": "^3.6.4",
     "typescript": "^5.6.3",
+    "vitest": "^4.1.12",
     "vite": "^5.4.11"
   }
 }

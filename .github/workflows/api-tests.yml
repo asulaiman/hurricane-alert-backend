@@ -1,0 +1,35 @@
+name: Backend API tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  api-tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Run API and notification tests
+        id: tests
+        run: npm run test:notifications && npm test
+      - name: Publish test failure to Slack
+        if: >-
+          ${{ failure() && !cancelled() && steps.tests.outcome == 'failure' &&
+              (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        run: node scripts/notify-test-failure.mjs
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          TEST_SERVICE: Backend
+          TEST_OUTCOME: ${{ steps.tests.outcome }}
+          TEST_CANCELLED: ${{ cancelled() }}
+          TEST_REF: ${{ github.head_ref || github.ref }}

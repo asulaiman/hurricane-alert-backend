@@ -32,6 +32,56 @@ The scheduled workflow in `.github/workflows/check-subscriptions.yml` calls
 secrets `API_BASE_URL` and `CRON_SECRET`; the latter must match the deployment
 environment variable.
 
+## HTTP API tests
+
+```sh
+npm ci
+npm test
+npm run test:watch
+```
+
+Vitest starts an ephemeral loopback HTTP server using the real local route
+adapter and handlers. Database and notification delivery modules are mocked;
+weather provider responses are synthetic and unexpected upstream calls fail.
+No database credentials, real emails, push deliveries, or separately running
+API are needed. Tests use an automatically assigned port, so the local preview
+on port 3001 is unaffected.
+
+The suite checks availability and CORS for all six exposed routes; normalized
+NWS/GDACS alert data; subscription and push JSON success/error shapes;
+verification/unsubscribe HTML confirmations; and authenticated cron counters,
+location grouping, and notification URL contracts. There is no `/api/health`
+endpoint; readiness is checked against existing routes, not a new endpoint.
+
+These are isolated HTTP contract tests, not deployment monitoring or real
+database/provider integration tests. They preserve current behavior: official
+provider failures return an empty alerts array, and cron `notified` counts
+eligible notifications, not confirmed deliveries. Verification/unsubscribe
+are HTML-body contracts; the local adapter currently does not set an explicit
+HTML content type.
+
+## GitHub Actions failure alerts
+
+`.github/workflows/api-tests.yml` runs type-checking and API/notification tests.
+Only failed tests publish an alert identifying the backend, repository,
+branch/ref, and failed-run URL. Successes and cancellations do not send
+notifications, and original test failures retain their failing exit status.
+Notifier errors are reported explicitly.
+
+An authorized Slack administrator must provision an incoming webhook bound to
+**#hurricane-app-alerting** (channel `C0CDX2E5546`), then store its URL directly
+in this repository's **Settings > Secrets and variables > Actions** as
+`SLACK_WEBHOOK_URL`. Add the same secret in `asulaiman/hurricane-alert` for
+frontend failures. Do not paste webhook URLs into chat, commit them, or print
+them in logs. The destination channel is configured in Slack.
+Live delivery remains unavailable until the webhook and secrets are configured;
+a failed trusted test run reports missing configuration.
+
+Fork pull requests run tests without secrets and skip notifications. Workflows
+use read-only contents permissions and do not use `pull_request_target`.
+Run `npm run test:notifications` to validate failure/success/cancellation,
+safe metadata encoding, and webhook errors with no real Slack messages.
+
 ## Environment
 
 `DATABASE_URL` is required. `RESEND_API_KEY` and the VAPID variables enable
