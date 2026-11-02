@@ -2,7 +2,7 @@
 
 Backend service for [hurricane-alert-frontend](https://github.com/asulaiman/hurricane-alert-frontend).
 It serves official weather alerts, subscription and verification endpoints,
-push and email delivery, and the scheduled subscription checker.
+push and email delivery, and the manually triggered subscription checker.
 
 ## Ownership
 
@@ -38,8 +38,10 @@ from `.env.example` in the deployment. Set `APP_BASE_URL` to the frontend's
 origin and `API_BASE_URL` to this service's public origin. Run
 `npm run migrate` once against the production database.
 
-The scheduled workflow in `.github/workflows/check-subscriptions.yml` calls
-`/api/cron/check-subscriptions` every 20 minutes. Add repository Actions
+The manual-only workflow in `.github/workflows/check-subscriptions.yml` calls
+`/api/cron/check-subscriptions` when you select **Actions > Check subscriptions >
+Run workflow** in GitHub. It has no scheduled or other automatic triggers.
+Add repository Actions
 secrets `API_BASE_URL` and `CRON_SECRET`; the latter must match the deployment
 environment variable.
 
@@ -93,6 +95,47 @@ Fork pull requests run tests without secrets and skip notifications. Workflows
 use read-only contents permissions and do not use `pull_request_target`.
 Run `npm run test:notifications` to validate failure/success/cancellation,
 safe metadata encoding, and webhook errors with no real Slack messages.
+
+## Automatic fix proposals
+
+The proposed `propose-test-fix.yml` uses the Copilot cloud agent
+[agent tasks API](https://docs.github.com/en/rest/agent-tasks/agent-tasks),
+a public preview whose task-start endpoint currently requires Copilot
+Business or Enterprise. It is not enabled until published on the default
+branch and configured.
+
+Create an expiring **fine-grained personal access token** owned by `asulaiman`,
+restricted to `hurricane-alert-backend` and `hurricane-alert-frontend`, with
+only repository **Agent tasks: read and write** plus implicit metadata read.
+Store it directly in each repo's Actions secrets as `COPILOT_AGENT_TOKEN`;
+never share its value in chat, logs, source, or issues. Do not reuse desktop
+credentials. Installation tokens and `GITHUB_TOKEN` cannot start tasks.
+The token's user needs repository write access, cloud agent enabled, and an
+eligible subscription; rotate the token before expiry. The workflow uses
+its separate ephemeral `GITHUB_TOKEN` for contents/actions/PR read and issues
+write bookkeeping. Keep the existing `SLACK_WEBHOOK_URL` configured.
+
+The event-driven handler accepts only actual test-step failures on the
+current default-branch head from trusted user pushes. It excludes forks/PRs,
+bots, simulation/fix branches, stale commits, successes, and cancellations.
+It checks out only trusted default-branch code, not failed-run artifacts,
+and uses a fixed prompt treating logs/repo text as untrusted evidence.
+
+A durable tracking issue reserves one attempt per failed SHA before starting
+one paid Copilot task. It is not a placeholder fix PR. Copilot is instructed
+to reproduce, make an evidence-based minimal fix without weakening tests,
+validate, link the failed run, and open a separate PR; never auto-merge.
+Only a completed task with a verified non-empty open Copilot PR targeting
+this repo's default branch produces a Slack PR-link alert. Existing immediate
+test-failure alerts remain separate. Human review still determines correctness.
+
+Polling stops after 45 minutes, without automatic task or webhook retries.
+Errors, no/empty PR, agent input requests, timeout, and uncertain Slack delivery
+are explicit failures recorded in the issue. The task may continue after
+observation times out; inspect task/issue/channel before manual intervention.
+Attempts are bounded, but AI billing must be controlled through plan budgets.
+`npm run test:notifications` covers the flow and guards with mocked APIs;
+live task execution remains unverified until token/plan setup is complete.
 
 ## Environment
 

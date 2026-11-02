@@ -1,8 +1,6 @@
 name: Check subscriptions
 
 on:
-  schedule:
-    - cron: '*/20 * * * *'
   workflow_dispatch: {}
 
 concurrency:

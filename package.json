@@ -7,7 +7,7 @@
     "dev": "vite --port 3001",
     "build": "tsc --noEmit",
     "test": "vitest run",
-    "test:notifications": "node --test scripts/notify-test-failure.test.mjs",
+    "test:notifications": "node --test scripts/notify-test-failure.test.mjs scripts/propose-test-fix.test.mjs",
     "test:watch": "vitest",
     "migrate": "node --env-file=.env.local scripts/migrate.mjs"
   },

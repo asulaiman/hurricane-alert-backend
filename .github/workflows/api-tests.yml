@@ -31,5 +31,5 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           TEST_SERVICE: Backend
           TEST_OUTCOME: ${{ steps.tests.outcome }}
-          TEST_CANCELLED: ${{ cancelled() }}
+          TEST_CANCELLED: 'false'
           TEST_REF: ${{ github.head_ref || github.ref }}
